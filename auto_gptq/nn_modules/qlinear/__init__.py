@@ -20,9 +20,6 @@ class GeneralQuantLinear(nn.Linear):
         self.register_buffer('qweight', quant_linear_module.qweight)
         self.bias.data = quant_linear_module.bias
 
-        self.qweight.requires_grad = False
-        self.bias.requires_grad = False
-
         self.register_buffer('qzeros', quant_linear_module.qzeros)
         self.register_buffer('scales', quant_linear_module.scales)
         self.register_buffer('g_idx', quant_linear_module.g_idx)
@@ -39,7 +36,7 @@ class GeneralQuantLinear(nn.Linear):
         self.forward = quant_linear_module.forward
 
     @classmethod
-    def inject_to_model(cls, model, target_module_type):
+    def convert_to_torch_linear(cls, model: nn.Module, target_module_type: "QuantLinear"):
         for name, m in model.named_modules():
             if not isinstance(m, target_module_type):
                 continue
