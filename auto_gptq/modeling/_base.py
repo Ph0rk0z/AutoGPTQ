@@ -922,19 +922,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 cls._fuse_attention(model, attn_op, trainable)
             except NotImplementedError:
                 inject_fused_attention = False
-                logger.warning(f"{cls.__name__} hasn't fused attention module yet, will skip inject fused attention.")
-            else:
-                cls.fused_attn_module_type.inject_to_model(
-                    model,
-                    use_triton=use_triton,
-                    group_size=quantize_config.group_size,
-                    use_cuda_fp16=use_cuda_fp16,
-                    desc_act=quantize_config.desc_act,
-                    trainable=trainable,
-                    bits=quantize_config.bits,
-                    disable_exllama=disable_exllama,
+                logger.warning(
+                    f"{cls.__name__} doesn't support fusing attention yet, will skip inject fused attention."
                 )
-
+            except:
+                logger.error(
+                    f"Inject fused attention failed, you can set 'inject_fused_attention' to False to "
+                    f"bypass the error for now and report it on github."
+                )
+                raise
         if inject_fused_mlp:
             try:
                 cls._fuse_mlp(model, trainable)
@@ -956,6 +952,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "or ask any question about those two features on github if you encounter unexpected "
                 "behaviors and errors."
             )
+
 
 
         # == step6: (optional) warmup triton == #
