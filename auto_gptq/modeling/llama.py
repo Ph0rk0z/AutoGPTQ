@@ -40,6 +40,7 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
         rope_cache = build_rope_cache(
             rotary_dim=model_config.hidden_size // num_heads,
             max_position=model_config.max_position_embeddings,
+            base=10000,
             device=model.device,
             dtype=model.dtype
         )
@@ -61,6 +62,7 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
                 num_key_heads=num_heads,
                 num_value_heads=num_heads,
                 attn_dropout=0.0,
+                resid_dropout=0.0,
                 scale=scale,
                 attention_ops=attn_op,
                 outputs_handler=(lambda x, y, z: (x, z, y)),

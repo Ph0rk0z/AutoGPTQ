@@ -44,7 +44,11 @@ if __name__ == "__main__":
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=args.use_fast_tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_name,
+        use_fast=args.use_fast_tokenizer,
+        trust_remote_code=args.trust_remote_code
+    )
     if not tokenizer.pad_token_id:
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
@@ -71,7 +75,7 @@ if __name__ == "__main__":
             use_safetensors=args.use_safetensors,
             trust_remote_code=args.trust_remote_code,
             inject_fused_mlp=args.inject_fused_mlp,
-            inject_fused_attention=args.inject_fused_attention
+            inject_fused_attention=args.inject_fused_attention,
             disable_exllama=args.disable_exllama
         )
     else:
