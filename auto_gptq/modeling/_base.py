@@ -766,6 +766,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "this may cause unexpected behavior or lead to error if you are training "
                 "a quantized model with fused ops, please consider disabling 'inject_fused_attention' "
                 "and 'inject_fused_mlp'."
+            )
         if not disable_exllama and not EXLLAMA_KERNELS_AVAILABLE:
             logger.warning(
                 "Exllama kernel is not installed, reset disable_exllama to True. "
