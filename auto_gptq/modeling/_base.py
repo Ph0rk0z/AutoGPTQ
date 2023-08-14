@@ -24,7 +24,9 @@ from ._utils import *
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
-from ..utils.import_utils import dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE
+from ..utils.import_utils import (
+    dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE
+)
 
 logger = getLogger(__name__)
 
@@ -764,6 +766,22 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "this may cause unexpected behavior or lead to error if you are training "
                 "a quantized model with fused ops, please consider disabling 'inject_fused_attention' "
                 "and 'inject_fused_mlp'."
+        if not disable_exllama and not EXLLAMA_KERNELS_AVAILABLE:
+            logger.warning(
+                "Exllama kernel is not installed, reset disable_exllama to True. "
+                "This may because you installed auto_gptq using a pre-build wheel "
+                "on Windows, in which exllama_kernels are not compiled. To use "
+                "exllama_kernels to further speedup inference, you can re-install "
+                "auto_gptq from source."
+            )
+            disable_exllama = True
+        if not AUTOGPTQ_CUDA_AVAILABLE:
+            logger.warning(
+                "CUDA kernels for auto_gptq are not installed, this will result in "
+                "very slow inference speed. This may because:\n"
+                "1. You disabled CUDA extensions compilation by setting BUILD_CUDA_EXT=0 when install auto_gptq from source.\n"
+                "2. You are using pytorch without CUDA support.\n"
+                "3. CUDA and nvcc are not installed in your device."
             )
 
         # == step1: prepare configs and file names == #
