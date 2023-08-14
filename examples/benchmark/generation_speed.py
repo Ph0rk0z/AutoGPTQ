@@ -277,7 +277,7 @@ def main():
         use_safetensors=args.use_safetensors,
         use_fast_tokenizer=args.use_fast_tokenizer,
         inject_fused_attention=args.inject_fused_attention,
-        inject_fused_mlp=args.inject_fused_mlp
+        inject_fused_mlp=args.inject_fused_mlp,
         disable_exllama=args.disable_exllama
     )
     end = time.time()

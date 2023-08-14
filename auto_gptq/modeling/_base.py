@@ -727,8 +727,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,
-        disable_exllama: bool = False,
         attn_op: Optional[AttentionOp] = None,
+        disable_exllama: bool = False,
         **kwargs
     ):
         """load quantized model from local disk"""
@@ -766,6 +766,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "this may cause unexpected behavior or lead to error if you are training "
                 "a quantized model with fused ops, please consider disabling 'inject_fused_attention' "
                 "and 'inject_fused_mlp'."
+            )
         if not disable_exllama and not EXLLAMA_KERNELS_AVAILABLE:
             logger.warning(
                 "Exllama kernel is not installed, reset disable_exllama to True. "
@@ -782,6 +783,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "1. You disabled CUDA extensions compilation by setting BUILD_CUDA_EXT=0 when install auto_gptq from source.\n"
                 "2. You are using pytorch without CUDA support.\n"
                 "3. CUDA and nvcc are not installed in your device."
+
             )
 
         # == step1: prepare configs and file names == #
@@ -836,9 +838,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if not disable_exllama and trainable:
             logger.warning("QuantLinear with exllama backend not support trainable mode yet, Switch to the pytorch backend.")
             disable_exllama = True
-            
         elif not use_triton and trainable:
-            logger.warning("QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")
+            logger.warning(
+                "QuantLinear with cuda backend not support trainable mode yet, will switch to pytorch backend, "
+                "this may cause very slow inference speed, disable trainable if you are not training model."
+            )
 
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
@@ -922,7 +926,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
         model = simple_dispatch_model(model, device_map)
 
-        # == step4: set seqlen == #
+        # == step4: post init model == #
+        # Any post-initialization that require device information, for example buffers initialization on device.
+        model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
+
+        # == step5: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
@@ -934,7 +942,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("Can't get model's sequence length from model config, will set to 4096.")
             model.seqlen = 4096
 
-        # == step5: (optional) inject optimized module == #
+        # == step6: (optional) inject optimized module == #
         if inject_fused_attention:
             try:
                 cls._fuse_attention(model, attn_op, trainable)
@@ -966,19 +974,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if inject_fused_attention or inject_fused_mlp:
             logger.warning(
                 "You are using at least one of 'inject_fused_attention' and 'inject_fused_mlp' "
-                "modes, which are now marked as experiment features, feel free to open an issue "
+                "modes, which are now marked as experimental features, feel free to open an issue "
                 "or ask any question about those two features on github if you encounter unexpected "
                 "behaviors and errors."
             )
 
-
-
-        # == step6: (optional) warmup triton == #
+        # == step7: (optional) warmup triton == #
         if use_triton and warmup_triton:
             cls.warmup_triton(model)
 
-        # == step7: convert all QuantLinear to sub-class of torch.nn.Linear
-        # note if inject_fused_attention() and inject_fused_mlp() is implemented,
+        # == step8: convert all QuantLinear to sub-class of torch.nn.Linear
+        # note if _fuse_attention() and _fuse_mlp() is implemented,
         # all QuantLinear will be converted to sub-class of torch.nn.Linear at injection stage
         GeneralQuantLinear.convert_to_torch_linear(
             model,
@@ -986,8 +992,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 use_triton,
                 quantize_config.desc_act,
                 quantize_config.group_size,
-                bits=quantize_config.bits
-
+                quantize_config.bits,
+                disable_exllama
             )
         )
 
@@ -1025,7 +1031,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             return
 
         from ..nn_modules.qlinear.qlinear_triton import QuantLinear
-
         QuantLinear.warmup(self.model, seqlen=self.model.seqlen)
 
         if self.fused_mlp_module_type is not None:
